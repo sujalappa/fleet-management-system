@@ -4,6 +4,13 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "seed": "node scripts/seedKamptee.js",
+    "vecv:test": "node scripts/vecvSmokeTest.js",
+    "vecv:onboard": "node scripts/onboardVehicle.js",
+    "volvo:onboard": "node scripts/onboardVolvoFleet.js",
+    "trips:report": "node scripts/tripReport.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -11,8 +18,11 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.2",
     "mongoose": "^9.9.1"
   }
 }

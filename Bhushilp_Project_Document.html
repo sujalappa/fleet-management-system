@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bhushilp Mine Operations Platform</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        h1, h2 {
+            color: #1a5c3a;
+            border-bottom: 2px solid #1a5c3a;
+            padding-bottom: 10px;
+        }
+        h3 {
+            color: #2d8659;
+            margin-top: 20px;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        ul, ol {
+            line-height: 1.8;
+        }
+        li {
+            margin: 10px 0;
+        }
+        strong {
+            color: #1a5c3a;
+        }
+        .timeline {
+            background: #f0f8f4;
+            border-left: 4px solid #1a5c3a;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        code {
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>⛏️ Real-Time Fleet Monitoring and Operational Analytics Platform for Kamptee Opencast Coal Mine</h1>
+
+    <div class="section">
+        <h2>The Problem Statement</h2>
+        <p>Overburden (OB) rehandling operations at Kamptee Opencast Coal Mine are constrained by fragmented data collection, limited real-time visibility, and reactive maintenance scheduling. Current operations lack integrated telemetry from vehicle fleets, making it difficult to optimize haul cycles, predict equipment failures, monitor fuel efficiency, and plan preventive maintenance. The absence of centralized operational dashboards and historical analytics limits the mine's ability to improve productivity, reduce operational costs, and ensure timely equipment servicing. Field data is collected across multiple sources—manual logs, disparate telematics endpoints, and service records—creating silos that prevent holistic operational insight.</p>
+    </div>
+
+    <div class="section">
+        <h2>Solution</h2>
+        <p>This project will develop an end-to-end MERN stack platform that integrates real-time vehicle telematics from the VECV Partner API with operational data management, live fleet visualization, and predictive analytics to enable efficient OB rehandling at Kamptee Opencast Coal Mine. The platform ingests Location, Fuel, Service History, and Alert streams from active Eicher-manufactured vehicles, processes multi-source geospatial and operational data through standardized pipelines, and presents unified dashboards for real-time fleet tracking, performance analytics, and maintenance planning. Features include live GPS-based vehicle positioning on satellite maps, dynamic KPI monitoring (total OB moved, revenue generated, operational costs, trips completed), fuel consumption tracking, service history correlation with equipment condition, and predictive alert aggregation from vehicle diagnostics. The overarching objective is to centralize operational visibility, reduce non-productive time, extend equipment life through timely maintenance, optimize haul logistics, and provide data-driven decision support for mine planning and scheduling.</p>
+    </div>
+
+    <div class="section">
+        <h2>Objectives</h2>
+        <ol>
+            <li>Design and implement a MERN-stack platform with JWT-authenticated access, multi-mine project isolation, and role-based dashboard views for dispatchers, fleet managers, and maintenance engineers.</li>
+            <li>Integrate the VECV Partner API (Location, Fuel, Service History, Alerts modules) to ingest real-time and historical telematics for all Eicher-manufactured vehicles (tippers, excavators, dozers) operating in OB rehandling cycles.</li>
+            <li>Establish standardized data models and ingestion pipelines for vehicle state, trip records, fuel consumption, service events, and predictive alerts, with support for mixed real-telematics and simulated data during rollout.</li>
+            <li>Develop live map visualization with real-time vehicle positioning, geofence boundaries (Area A excavation site and Camp Yard dump point), and animated route tracking at 45 km/h average haul speed.</li>
+            <li>Construct operational dashboards displaying real-time KPIs (total OB volume moved, revenue, cost, trips) alongside historical trend analysis (daily production, average trips per day, equipment utilization).</li>
+            <li>Implement alert aggregation and acknowledgment workflows for vehicle faults, maintenance due dates, fuel anomalies, and service recommendations derived from VECV telemetry.</li>
+            <li>Create service history and maintenance log interfaces to correlate workshop service records with vehicle performance degradation and plan preventive interventions.</li>
+            <li>Enable scalable multi-mine architecture where new mining operations can be onboarded with minimal code changes via configuration-driven database isolation and project registry patterns.</li>
+        </ol>
+    </div>
+
+    <div class="section">
+        <h2>Methodology</h2>
+
+        <h3>Data Acquisition & Integration</h3>
+        <p>Real-time and historical data are acquired via the VECV Partner API, which supplies Location (GPS, speed, vehicle status), Fuel (consumption, level, engine hours), Service History (dealer records, parts, labor costs), and Alerts (predictive maintenance, fault codes) for all registered Eicher vehicles. Vehicle data is supplemented by internal operational records (trip logs, driver assignments, equipment metadata) stored in a MongoDB project-specific database. All external telematics are ingested through a unified, idempotent ingestion endpoint that tags records with source (seed data, manual input, telematics), external reference IDs, and timestamps for traceability.</p>
+
+        <h3>Data Standardization & Storage</h3>
+        <p>A standardized Mongoose schema hierarchy models vehicles (with chassis number and data source flags), trips (haul cycles from Area A to Camp Yard), fuel logs (consumption snapshots), GPS logs (position with vehicle status), maintenance records (workshop service events), alerts (vehicle diagnostics), and service history (job card details). MongoDB's multi-database support via <code>useDb()</code> enforces project isolation—each mine's operational data (e.g., <code>dummy_kamptee_fleet</code> or <code>fleet_kamptee</code>) remains independent while cross-project users are stored centrally in <code>bhushilp_platform</code>. Rate-limited polling of the VECV API (≤1 request/minute per endpoint) is orchestrated by a background poller that runs only when API credentials are configured and vehicles are onboarded to live telemetry.</p>
+
+        <h3>Visualization & Real-Time Analytics</h3>
+        <p>The frontend displays live fleet state on Esri satellite maps with color-coded vehicle markers (green for loaded haul leg, blue for empty return leg), geofence overlays, and interactive popups showing real-time GPS, speed, and vehicle status. For vehicles onboarded to VECV telemetry, real GPS positions override simulated positions; vehicles on the simulation path continue to animate deterministically based on haul cycle timing. KPI cards present aggregated metrics (total OB, revenue, cost, trips) and trend charts (daily production over time, average trips per day) derived from trip aggregation pipelines. Alerts and service history are displayed in scrollable feeds with acknowledgment controls, enabling dispatchers to respond to vehicle issues and maintenance engineers to plan workshop interventions.</p>
+
+        <h3>Validation & Scalability</h3>
+        <p>A smoke-test script validates VECV API connectivity, token acquisition, and header requirements before production deployment. Spatially aware validation compares telemetry-derived positions and timing against historical trip records to ensure data quality. The architecture supports gradual fleet onboarding—vehicles are transitioned from simulated to live telemetry by updating a single database field (<code>data_source: "vecv_live"</code> and <code>chassis_number</code>), enabling A/B comparison and phased rollout without code changes or redeployment.</p>
+    </div>
+
+    <div class="section">
+        <h2>Deliverables</h2>
+
+        <h3>1. Full-stack MERN Application</h3>
+        <ul>
+            <li><strong>Backend:</strong> Express.js REST API with JWT authentication, project-scoped routes, multi-database isolation, and VECV API integration</li>
+            <li><strong>Frontend:</strong> React dashboard with live map, KPI cards, trend charts, alerts, and service history components</li>
+            <li><strong>Deployment:</strong> Deployment-ready code with environment variable configuration for multi-mine support</li>
+        </ul>
+
+        <h3>2. Data Ingestion & Polling Infrastructure</h3>
+        <ul>
+            <li>VECV Partner API client modules (Location, Fuel, Service History, Alerts)</li>
+            <li>Background poller with configurable rate-limited polling and upsert logic</li>
+            <li>Standardized Mongoose schemas with external reference tracking for idempotent ingestion</li>
+            <li>Smoke-test and onboarding scripts for validation and fleet configuration</li>
+        </ul>
+
+        <h3>3. Operational Dashboards</h3>
+        <ul>
+            <li>Overview tab with live map, real-time KPIs, and trend analysis</li>
+            <li>Fleet Operations tab with vehicle state table, alerts feed, and service history</li>
+            <li>Drivers tab with assignment and performance tracking</li>
+            <li>Cameras tab for event logging and incident review</li>
+        </ul>
+
+        <h3>4. Geospatial & Telemetry Visualization</h3>
+        <ul>
+            <li>Interactive satellite map with real-time vehicle positions, route overlays, and geofences</li>
+            <li>Dynamic vehicle markers distinguishing live (white ring) from simulated (default) positions</li>
+            <li>Popup details showing GPS, speed, vehicle status, and data source indicators</li>
+        </ul>
+
+        <h3>5. Technical Documentation</h3>
+        <ul>
+            <li>Architecture overview and system design document</li>
+            <li>API specification and integration guide for VECV telematics</li>
+            <li>Deployment guide with environment setup and MongoDB configuration</li>
+            <li>Database schema reference and field mappings from VECV API</li>
+            <li>Operational runbook for alert handling, maintenance workflows, and fleet onboarding</li>
+        </ul>
+
+        <h3>6. Multi-Mine Platform Foundation</h3>
+        <ul>
+            <li>Project registry and configuration system for new mine deployments</li>
+            <li>Database isolation patterns enabling simultaneous operations across multiple sites</li>
+            <li>Role-based access control and JWT-authenticated API endpoints</li>
+            <li>Extensible ingestion pipeline supporting future telematics sources</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>Timeline</h2>
+        <div class="timeline">
+            <p><strong>6 Months</strong></p>
+            <ul>
+                <li><strong>Month 1–2:</strong> Finalize VECV API integration, complete schema design, validate telematics ingestion pipeline</li>
+                <li><strong>Month 2–3:</strong> Develop frontend dashboards (map, KPIs, alerts, service history), build real-time animation and aggregation queries</li>
+                <li><strong>Month 3–4:</strong> Deploy smoke tests, conduct phased fleet onboarding, validate data quality and alert accuracy</li>
+                <li><strong>Month 4–5:</strong> Refine UI/UX, implement batch import utilities, document operational procedures</li>
+                <li><strong>Month 5–6:</strong> Load testing, multi-mine configuration validation, final deployment to production environment</li>
+            </ul>
+        </div>
+    </div>
+
+</body>
+</html>

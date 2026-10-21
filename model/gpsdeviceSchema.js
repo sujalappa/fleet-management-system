@@ -54,4 +54,5 @@ const gpsDeviceSchema = new mongoose.Schema(
 
 const GPSDevice = mongoose.model("GPSDevice", gpsDeviceSchema);
 
+export { gpsDeviceSchema };
 export default GPSDevice;

@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+@theme {
+  /* Light, professional palette: white surfaces on a cool grey canvas,
+     one brand blue, and status colours dark enough to read on white. */
+  --color-ink: #f4f6fa;          /* page background */
+  --color-panel: #ffffff;        /* cards, tables, bars */
+  --color-panel-hover: #f8fafc;
+  --color-border: #e3e8ef;
+  --color-text: #0f172a;
+  --color-muted: #64748b;
+
+  --color-accent: #1d4ed8;       /* brand blue */
+  --color-accent-2: #0ea5e9;
+  --color-brand-dark: #0b1f4d;   /* sidebar / login panel */
+
+  --color-ok: #15803d;
+  --color-warn: #b45309;
+  --color-idle: #c2410c;
+  --color-bad: #b91c1c;
+  --color-info: #1d4ed8;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-ink);
+  color: var(--color-text);
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-ink);
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 8px;
+}
+
+.leaflet-container {
+  background: var(--color-panel) !important;
+}

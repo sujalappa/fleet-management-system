@@ -1,0 +1,11 @@
+node_modules/
+.env
+atlas-credentials.env
+.DS_Store
+dist/
+build/
+*API Key*.pdf
+credentials/
+.claude/
+tmp/
+logs/
