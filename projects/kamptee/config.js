@@ -42,9 +42,10 @@ const kampteeConfig = {
       id: "LOAD-01",
       name: "Loading Point & Halt Area",
       zoneType: "loading",
-      // 21°14'39.8"N 79°13'00.8"E — trucks load here and rest here at
-      // shift change.
-      center: { lat: 21.24438, lng: 79.216896 },
+      // Centre of where trucks actually stand while loading: the cluster of
+      // 8 truck positions sampled 2026-10-21 (spread 131 m), 126 m NE of the
+      // site's original pin (21.24438, 79.216896), which stays inside.
+      center: { lat: 21.24516, lng: 79.21777 },
       radiusMeters: 200
     },
     {
