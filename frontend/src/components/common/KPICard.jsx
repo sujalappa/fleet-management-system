@@ -20,7 +20,7 @@ export default function KPICard({ label, value, sub, icon: Icon, accent = "accen
           </span>
         )}
       </div>
-      <div className="truncate text-2xl font-semibold tracking-tight text-text">{value}</div>
+      <div className="break-words text-xl font-semibold leading-tight tracking-tight text-text xl:text-2xl">{value}</div>
       {sub && <div className="text-xs text-muted">{sub}</div>}
     </div>
   );

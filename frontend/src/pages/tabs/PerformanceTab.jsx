@@ -1,21 +1,29 @@
 import { useState } from "react";
-import { Clock, Droplets, Fuel, Gauge, Hammer, Route } from "lucide-react";
+import { ChevronRight, Clock, Droplets, Fuel, Gauge, Hammer, Route } from "lucide-react";
 import useFetch from "../../hooks/useFetch.js";
 import api from "../../services/api.js";
 import StateBlock from "../../components/common/StateBlock.jsx";
 import KPICard from "../../components/common/KPICard.jsx";
+import DateRangePicker, { rangeLabel, todayIst } from "../../components/common/DateRangePicker.jsx";
+import VehicleDetailPanel from "../../components/fleet/VehicleDetailPanel.jsx";
 
 const DASH = "—";
-const fmt = (v, unit = "") => (v == null ? DASH : `${v.toLocaleString()}${unit}`);
-
-// Today's date in IST, as YYYY-MM-DD for the date input.
-function todayIst() {
-  return new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
-}
+// Totals over long ranges run into thousands — drop decimals there so the
+// numbers stay readable (and fit their cards).
+const fmt = (v, unit = "") => {
+  if (v == null) return DASH;
+  const n = Math.abs(v) >= 1000 ? Math.round(v) : v;
+  return `${n.toLocaleString("en-IN")}${unit}`;
+};
 
 export default function PerformanceTab() {
-  const [date, setDate] = useState(todayIst());
-  const { data, loading, error } = useFetch(() => api.get(`/analytics/performance?date=${date}`), [date]);
+  const [range, setRange] = useState(() => ({ from: todayIst(), to: todayIst() }));
+  const [selected, setSelected] = useState(null);
+  const { data, loading, error } = useFetch(
+    () => api.get(`/analytics/performance?from=${range.from}&to=${range.to}`),
+    [range.from, range.to]
+  );
+  const label = rangeLabel(range);
 
   const columns = [
     ["Fuel Used", (v) => fmt(v.fuel_used_l, " L")],
@@ -23,12 +31,12 @@ export default function PerformanceTab() {
     ["Engine Hrs", (v) => fmt(v.engine_hours)],
     ["Avg L/hr", (v) => fmt(v.avg_fuel_l_per_hour)],
     ["km/L", (v) => fmt(v.km_per_l)],
-    ["Idle", (v) => (v.idle_hours == null ? DASH : `${v.idle_hours} h (${v.idle_pct}%)`)],
+    ["Idle", (v) => (v.idle_hours == null ? DASH : `${fmt(v.idle_hours)} h (${v.idle_pct}%)`)],
     ["Idle Fuel", (v) => fmt(v.idle_fuel_l, " L")],
     ["Avg Speed", (v) => fmt(v.avg_moving_speed_kmh, " km/h")],
-    ["Tipping", (v) => (v.tipping_hours == null ? DASH : `${v.tipping_hours} h`)],
-    ["Harsh Brake", (v) => (v.harsh_braking_sec == null ? DASH : `${Math.round(v.harsh_braking_sec / 60)} min`)],
-    ["Harsh Accel", (v) => (v.harsh_accel_sec == null ? DASH : `${Math.round(v.harsh_accel_sec / 60)} min`)],
+    ["Tipping", (v) => (v.tipping_hours == null ? DASH : `${fmt(v.tipping_hours)} h`)],
+    ["Harsh Brake", (v) => (v.harsh_braking_sec == null ? DASH : `${fmt(Math.round(v.harsh_braking_sec / 60))} min`)],
+    ["Harsh Accel", (v) => (v.harsh_accel_sec == null ? DASH : `${fmt(Math.round(v.harsh_accel_sec / 60))} min`)],
     [`>${data?.thresholds?.overspeedKmh ?? 60} km/h`, (v) => fmt(v.overspeed_min, " min")],
     [`>${data?.thresholds?.highRpm ?? 2000} rpm`, (v) => fmt(v.high_rpm_min, " min")]
   ];
@@ -36,20 +44,11 @@ export default function PerformanceTab() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold text-text">Fuel & Performance</h2>
-          <p className="text-xs text-muted">
-            Per-truck usage for one day (IST), from each truck's own sensors. Volvo: full metrics · Eicher: fuel,
-            distance and engine hours.
-          </p>
-        </div>
-        <input
-          type="date"
-          value={date}
-          max={todayIst()}
-          onChange={(e) => setDate(e.target.value)}
-          className="rounded-lg border border-border bg-panel px-3 py-1.5 text-sm text-text"
-        />
+        <p className="max-w-2xl text-sm text-muted">
+          Fleet fuel and driving data for <b className="text-text">{label}</b>, from each truck's own sensors. Click a
+          truck for its current readings and last 2 / 24 hours.
+        </p>
+        <DateRangePicker value={range} onChange={setRange} />
       </div>
 
       <StateBlock loading={loading && !data} error={error}>
@@ -75,18 +74,26 @@ export default function PerformanceTab() {
                         {label}
                       </th>
                     ))}
+                    <th className="px-3 py-3" />
                   </tr>
                 </thead>
                 <tbody>
                   {data.vehicles.map((v) => (
-                    <tr key={v.vehicle_id} className="border-b border-border/60 last:border-0 hover:bg-panel-hover">
-                      <td className="px-3 py-3 font-medium text-text whitespace-nowrap">{v.vehicle_number}</td>
+                    <tr
+                      key={v.vehicle_id}
+                      onClick={() => setSelected(v)}
+                      className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-accent/5"
+                    >
+                      <td className="px-3 py-3 font-medium text-accent whitespace-nowrap">{v.vehicle_number}</td>
                       <td className="px-3 py-3 text-muted">{v.oem}</td>
                       {columns.map(([label, render]) => (
                         <td key={label} className="px-3 py-3 text-muted whitespace-nowrap">
                           {render(v)}
                         </td>
                       ))}
+                      <td className="px-3 py-3 text-muted">
+                        <ChevronRight size={16} />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -94,12 +101,17 @@ export default function PerformanceTab() {
             </div>
 
             <p className="text-xs text-muted">
-              Harsh braking / acceleration = time spent decelerating or accelerating faster than 1.1 m/s². Tipping
-              = PTO (body hydraulics) running while stationary. "—" = not reported by that truck for this day.
+              Volvo: full metrics · Eicher: fuel, distance and engine hours. Harsh braking / acceleration = time spent
+              decelerating or accelerating faster than 1.1 m/s². Tipping = PTO (body hydraulics) running while
+              stationary. "—" = not reported by that truck in this period.
             </p>
           </>
         )}
       </StateBlock>
+
+      {selected && (
+        <VehicleDetailPanel vehicle={selected} period={selected} periodLabel={label} onClose={() => setSelected(null)} />
+      )}
     </div>
   );
 }
