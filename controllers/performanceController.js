@@ -244,3 +244,123 @@ export const getVehicleSummary = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+const SHIFT_OPENING_GRACE_MS = 30 * 60 * 1000;
+
+// Telematics source for a vehicle: which collection, time field and fuel
+// counter hold its odometer / engine-hours readings.
+function readingSource(projectId, vehicle) {
+  const isVolvo = vehicle.data_source === "volvo_live";
+  return {
+    Model: getProjectModel(projectId, isVolvo ? "VehicleStatus" : "Fuel"),
+    timeField: isVolvo ? "created_at_vehicle" : "device_timestamp",
+    fuelField: isVolvo ? "total_fuel_used_liters" : "lifetime_fuel_consumption",
+    filter: isVolvo ? { vehicle_id: vehicle.vehicle_id } : { vehicle_id: vehicle.vehicle_id, source: "telematics" }
+  };
+}
+
+// GET /api/analytics/shift-log?date=YYYY-MM-DD   (IST; Shift III runs into the next morning)
+// Automatic shift logbook: per truck, the opening and closing odometer /
+// engine-hours readings of each shift and the usage between them.
+//  - Opening = reading at shift start: the last one up to 30 min before the
+//    start (truck already running), else the first reading in the shift.
+//  - Closing = last reading before the shift ends — so a truck switched off at
+//    13:30 in a 06:00–14:00 shift closes at its 13:30 reading.
+export const getShiftLog = async (req, res) => {
+  try {
+    const config = getProjectConfig(req.projectId);
+    const today = new Date(Date.now() + IST_OFFSET_MS).toISOString().slice(0, 10);
+    const date = ISO_DAY.test(req.query.date || "") ? req.query.date : today;
+
+    const Vehicle = getProjectModel(req.projectId, "Vehicle");
+    const vehicles = await Vehicle.find({
+      data_source: { $in: ["vecv_live", "volvo_live"] },
+      status: { $ne: "inactive" }
+    })
+      .sort({ data_source: 1, vehicle_number: 1 })
+      .lean();
+
+    const now = Date.now();
+    const shifts = [];
+    for (const shift of config.shifts || []) {
+      const start = new Date(`${date}T${shift.startTime}:00+05:30`);
+      let end = new Date(`${date}T${shift.endTime}:00+05:30`);
+      if (end <= start) end = new Date(end.getTime() + 24 * 60 * 60 * 1000); // night shift
+      const status = start.getTime() > now ? "upcoming" : end.getTime() > now ? "in_progress" : "closed";
+
+      const rows = [];
+      if (status !== "upcoming") {
+        const until = new Date(Math.min(end.getTime(), now));
+        for (const v of vehicles) {
+          const { Model, timeField, fuelField, filter } = readingSource(req.projectId, v);
+          const atStart = await Model.findOne({
+            ...filter,
+            [timeField]: { $lte: start, $gte: new Date(start - SHIFT_OPENING_GRACE_MS) }
+          })
+            .sort({ [timeField]: -1 })
+            .lean();
+          const firstIn = await Model.findOne({ ...filter, [timeField]: { $gt: start, $lt: until } })
+            .sort({ [timeField]: 1 })
+            .lean();
+          const lastIn = await Model.findOne({ ...filter, [timeField]: { $gt: start, $lt: until } })
+            .sort({ [timeField]: -1 })
+            .lean();
+          const opening = atStart || firstIn;
+          const closing = lastIn;
+
+          const base = { vehicle_id: v.vehicle_id, vehicle_number: v.vehicle_number, oem: v.data_source === "volvo_live" ? "Volvo" : "Eicher" };
+          if (!opening || !closing) {
+            rows.push({ ...base, operated: false });
+            continue;
+          }
+          const km = delta(closing.odometer_km, opening.odometer_km);
+          const hours = delta(closing.engine_hours, opening.engine_hours);
+          const fuel = delta(closing[fuelField], opening[fuelField]);
+          rows.push({
+            ...base,
+            operated: (km ?? 0) > 0 || (hours ?? 0) > 0,
+            opening: { at: opening[timeField], odometer_km: round(opening.odometer_km), engine_hours: round(opening.engine_hours, 1) },
+            closing: { at: closing[timeField], odometer_km: round(closing.odometer_km), engine_hours: round(closing.engine_hours, 1) },
+            // Truck stopped before the shift ended (e.g. switched off at 13:30).
+            // Volvo reports hourly, so its last report can be up to an hour
+            // early without the truck stopping — only an IGNITION_OFF report
+            // counts. Eicher reports every 1–4 min while running, so a
+            // silence over 15 min before the end means it stopped.
+            closed_early_min: (() => {
+              if (status !== "closed") return null;
+              const early = Math.round((end - new Date(closing[timeField])) / 60000);
+              const isVolvo = v.data_source === "volvo_live";
+              const stopped = isVolvo ? closing.trigger_type === "IGNITION_OFF" : early > 15;
+              return stopped && early > 0 ? early : null;
+            })(),
+            closing_event: v.data_source === "volvo_live" ? closing.trigger_type : closing.vehicle_status,
+            distance_km: round(km),
+            engine_hours: round(hours, 1),
+            fuel_used_l: round(fuel),
+            km_per_l: round(div(km, fuel), 2)
+          });
+        }
+      }
+
+      const operated = rows.filter((r) => r.operated);
+      const sum = (k) => {
+        const vals = operated.map((r) => r[k]).filter((x) => x != null);
+        return vals.length ? round(vals.reduce((a, b) => a + b, 0)) : null;
+      };
+      shifts.push({
+        id: shift.id,
+        name: shift.name,
+        start,
+        end,
+        status,
+        trucks_operated: operated.length,
+        totals: { distance_km: sum("distance_km"), engine_hours: sum("engine_hours"), fuel_used_l: sum("fuel_used_l") },
+        vehicles: rows
+      });
+    }
+
+    res.status(200).json({ success: true, data: { date, shifts } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

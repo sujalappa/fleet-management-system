@@ -1,18 +1,20 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { LayoutDashboard, Truck, Users, Camera, Fuel, LogOut, ChevronLeft, MapPin, Route } from "lucide-react";
+import { LayoutDashboard, Truck, Users, Camera, Fuel, LogOut, ChevronLeft, MapPin, Route, ClipboardList } from "lucide-react";
 import api from "../services/api.js";
 import { setActiveProjectId, clearSession, getUser } from "../services/auth.js";
 import OverviewTab from "./tabs/OverviewTab.jsx";
 import FleetTab from "./tabs/FleetTab.jsx";
 import PerformanceTab from "./tabs/PerformanceTab.jsx";
 import TripsTab from "./tabs/TripsTab.jsx";
+import ShiftLogTab from "./tabs/ShiftLogTab.jsx";
 import DriversTab from "./tabs/DriversTab.jsx";
 import CamerasTab from "./tabs/CamerasTab.jsx";
 
 const TABS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard, Component: OverviewTab, subtitle: "Live fleet map and production summary" },
   { id: "trips", label: "Trips", icon: Route, Component: TripsTab, subtitle: "Trip count and loading, haul and unloading times per shift" },
+  { id: "shifts", label: "Shift Log", icon: ClipboardList, Component: ShiftLogTab, subtitle: "Opening and closing odometer per truck, per shift" },
   { id: "fleet", label: "Fleet Operations", icon: Truck, Component: FleetTab, subtitle: "Status, fuel and engine data for every truck" },
   { id: "performance", label: "Fuel & Performance", icon: Fuel, Component: PerformanceTab, subtitle: "Daily fuel use, idling and driving behaviour" },
   { id: "drivers", label: "Drivers", icon: Users, Component: DriversTab, subtitle: "Driver assignments and performance" },
