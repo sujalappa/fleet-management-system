@@ -8,6 +8,7 @@ const STATE_TONE = {
   idle: "idle",
   breakdown: "bad",
   maintenance: "warn",
+  no_signal: "neutral",
   no_data: "neutral"
 };
 
@@ -17,6 +18,7 @@ const STATE_LABEL = {
   idle: "Idle",
   breakdown: "Breakdown",
   maintenance: "Maintenance",
+  no_signal: "No Signal",
   no_data: "No Data Yet"
 };
 
@@ -79,11 +81,23 @@ export default function FleetTable({ fleet }) {
                 ) : (
                   DASH
                 )}
+                {v.last_gps?.stale && (
+                  <div className="mt-1 text-xs text-muted">
+                    last: {v.last_gps.vehicleStatus || "—"}
+                    {v.last_gps.speed ? ` ${Math.round(v.last_gps.speed)} km/h` : ""} ·{" "}
+                    {new Date(v.last_gps.updatedAt).toLocaleTimeString("en-IN", {
+                      timeZone: "Asia/Kolkata",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: false
+                    })}
+                  </div>
+                )}
               </td>
               <td className="px-4 py-3">
                 <Badge tone={STATE_TONE[v.operational_state] || "neutral"}>
                   {STATE_LABEL[v.operational_state] || v.operational_state}
-                  {v.operational_state === "idle" ? ` · ${formatDuration(v.idle_minutes)}` : ""}
+                  {["idle", "no_signal"].includes(v.operational_state) ? ` · ${formatDuration(v.idle_minutes)}` : ""}
                 </Badge>
               </td>
               <td className="px-4 py-3 text-muted whitespace-nowrap">

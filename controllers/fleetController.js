@@ -79,7 +79,9 @@ export const getLiveFleet = async (req, res) => {
         // keeps reporting MOVING forever otherwise).
         const minutesSinceUpdate = (now - new Date(gps.device_timestamp).getTime()) / 60000;
         if (minutesSinceUpdate > IDLE_THRESHOLD_MINUTES) {
-          operational_state = "idle";
+          // We haven't heard from the device — that's not the same as the
+          // truck being idle, so don't claim either moving or idle.
+          operational_state = "no_signal";
           idle_minutes = Math.round(minutesSinceUpdate);
         } else if (gps.vehicle_status === "MOVING") operational_state = "on_trip";
         else operational_state = "recently_active";
@@ -167,7 +169,7 @@ export const getLiveFleet = async (req, res) => {
         acc[v.operational_state] = (acc[v.operational_state] || 0) + 1;
         return acc;
       },
-      { on_trip: 0, idle: 0, breakdown: 0, maintenance: 0, no_data: 0, recently_active: 0 }
+      { on_trip: 0, idle: 0, breakdown: 0, maintenance: 0, no_signal: 0, no_data: 0, recently_active: 0 }
     );
 
     res.status(200).json({ success: true, data: { fleet, summary } });

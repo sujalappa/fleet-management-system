@@ -43,7 +43,7 @@ export default function FleetTab() {
                   claim a measurement that doesn't exist. */}
               <KPICard label="Breakdown" value={fleetData.summary.breakdown || "—"} accent="bad" />
               <KPICard label="Maintenance" value={fleetData.summary.maintenance || "—"} accent="warn" />
-              <KPICard label="No Data" value={fleetData.summary.no_data} accent="info" />
+              <KPICard label="No Signal" value={(fleetData.summary.no_signal || 0) + (fleetData.summary.no_data || 0)} accent="info" />
               <KPICard label="Recently Active" value={fleetData.summary.recently_active} accent="accent" />
             </div>
             <div className="mt-4">
