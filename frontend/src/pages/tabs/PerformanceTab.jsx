@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronRight, Clock, Droplets, Fuel, Gauge, Hammer, Route } from "lucide-react";
+import { ChevronRight, Clock, Droplets, Fuel, Gauge, Hammer, Info, Loader2, Route } from "lucide-react";
 import useFetch from "../../hooks/useFetch.js";
 import api from "../../services/api.js";
 import StateBlock from "../../components/common/StateBlock.jsx";
@@ -48,12 +48,29 @@ export default function PerformanceTab() {
           Fleet fuel and driving data for <b className="text-text">{label}</b>, from each truck's own sensors. Click a
           truck for its current readings and last 2 / 24 hours.
         </p>
-        <DateRangePicker value={range} onChange={setRange} />
+        <div className="flex items-center gap-3">
+          {loading && data && (
+            <span className="inline-flex items-center gap-1.5 text-sm text-muted">
+              <Loader2 size={15} className="animate-spin" /> Updating…
+            </span>
+          )}
+          <DateRangePicker value={range} onChange={setRange} />
+        </div>
       </div>
+
+      {data?.data_since && range.from < data.data_since && (
+        <div className="flex items-start gap-2 rounded-lg border border-info/20 bg-info/5 px-4 py-3 text-sm text-text">
+          <Info size={16} className="mt-0.5 shrink-0 text-info" />
+          <span>
+            Telematics data starts on <b>{new Date(`${data.data_since}T00:00:00Z`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}</b>.
+            The part of this range before that has no readings, so any range starting earlier shows the same totals.
+          </span>
+        </div>
+      )}
 
       <StateBlock loading={loading && !data} error={error}>
         {data && (
-          <>
+          <div className={`flex flex-col gap-6 transition-opacity ${loading ? "pointer-events-none opacity-50" : ""}`}>
             <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
               <KPICard label="Fuel Used" value={fmt(data.totals.fuel_used_l, " L")} icon={Fuel} accent="bad" />
               <KPICard label="Distance" value={fmt(data.totals.distance_km, " km")} icon={Route} accent="info" />
@@ -105,7 +122,7 @@ export default function PerformanceTab() {
               decelerating or accelerating faster than 1.1 m/s². Tipping = PTO (body hydraulics) running while
               stationary. "—" = not reported by that truck in this period.
             </p>
-          </>
+          </div>
         )}
       </StateBlock>
 

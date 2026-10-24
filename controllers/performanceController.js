@@ -95,18 +95,18 @@ function eicherMetrics(first, last) {
 // Short windows ("last 2 hours") need a tight limit, or a truck that was
 // silent before the window would have hours of earlier usage counted in it.
 async function bracket(Model, filter, timeField, start, end, maxBaselineGapMs = BASELINE_LOOKBACK_MS) {
-  const before = await Model.findOne({
-    ...filter,
-    [timeField]: { $lt: start, $gte: new Date(start - maxBaselineGapMs) }
-  })
-    .sort({ [timeField]: -1 })
-    .lean();
-  const firstInDay = await Model.findOne({ ...filter, [timeField]: { $gte: start, $lt: end } })
-    .sort({ [timeField]: 1 })
-    .lean();
-  const last = await Model.findOne({ ...filter, [timeField]: { $gte: start, $lt: end } })
-    .sort({ [timeField]: -1 })
-    .lean();
+  // The three lookups are independent — run them together.
+  const [before, firstInDay, last] = await Promise.all([
+    Model.findOne({ ...filter, [timeField]: { $lt: start, $gte: new Date(start - maxBaselineGapMs) } })
+      .sort({ [timeField]: -1 })
+      .lean(),
+    Model.findOne({ ...filter, [timeField]: { $gte: start, $lt: end } })
+      .sort({ [timeField]: 1 })
+      .lean(),
+    Model.findOne({ ...filter, [timeField]: { $gte: start, $lt: end } })
+      .sort({ [timeField]: -1 })
+      .lean()
+  ]);
   const first = before || firstInDay;
   return first && last && String(first._id) !== String(last._id) ? { first, last } : null;
 }
@@ -128,17 +128,19 @@ export const getPerformance = async (req, res) => {
       .sort({ data_source: 1, vehicle_number: 1 })
       .lean();
 
-    const rows = [];
-    for (const v of vehicles) {
-      const base = {
-        vehicle_id: v.vehicle_id,
-        vehicle_number: v.vehicle_number,
-        oem: v.data_source === "volvo_live" ? "Volvo" : "Eicher"
-      };
-      if (v.data_source === "volvo_live") {
-        const b = await bracket(VehicleStatus, { vehicle_id: v.vehicle_id }, "created_at_vehicle", start, end);
-        rows.push({ ...base, ...(b ? volvoMetrics(b.first, b.last, perf) : {}) });
-      } else {
+    // All trucks in parallel — done one after another this took ~12 s per
+    // filter change, during which the page still showed the old numbers.
+    const rows = await Promise.all(
+      vehicles.map(async (v) => {
+        const base = {
+          vehicle_id: v.vehicle_id,
+          vehicle_number: v.vehicle_number,
+          oem: v.data_source === "volvo_live" ? "Volvo" : "Eicher"
+        };
+        if (v.data_source === "volvo_live") {
+          const b = await bracket(VehicleStatus, { vehicle_id: v.vehicle_id }, "created_at_vehicle", start, end);
+          return { ...base, ...(b ? volvoMetrics(b.first, b.last, perf) : {}) };
+        }
         const b = await bracket(
           FuelLog,
           { vehicle_id: v.vehicle_id, source: "telematics" },
@@ -146,9 +148,21 @@ export const getPerformance = async (req, res) => {
           start,
           end
         );
-        rows.push({ ...base, ...(b ? eicherMetrics(b.first, b.last) : {}) });
-      }
-    }
+        return { ...base, ...(b ? eicherMetrics(b.first, b.last) : {}) };
+      })
+    );
+
+    // Earliest telematics reading we hold, so the page can tell the user
+    // when a selected range starts before there was any data.
+    // Only trucks currently on the dashboard — retired trucks' older history
+    // would make data look like it goes back further than it does.
+    const activeIds = vehicles.map((v) => v.vehicle_id);
+    const [firstVolvo, firstEicher] = await Promise.all([
+      VehicleStatus.findOne({ vehicle_id: { $in: activeIds } }, { created_at_vehicle: 1 }).sort({ created_at_vehicle: 1 }).lean(),
+      FuelLog.findOne({ vehicle_id: { $in: activeIds }, source: "telematics" }, { device_timestamp: 1 }).sort({ device_timestamp: 1 }).lean()
+    ]);
+    const firstReading = [firstVolvo?.created_at_vehicle, firstEicher?.device_timestamp].filter(Boolean).sort((a, b) => a - b)[0];
+    const dataSince = firstReading ? new Date(new Date(firstReading).getTime() + IST_OFFSET_MS).toISOString().slice(0, 10) : null;
 
     // Fleet totals over trucks that reported.
     const sum = (k) => {
@@ -164,7 +178,7 @@ export const getPerformance = async (req, res) => {
     };
     totals.avg_fuel_l_per_hour = round(div(totals.fuel_used_l, totals.engine_hours));
 
-    res.status(200).json({ success: true, data: { from, to, date: from, thresholds: perf, totals, vehicles: rows } });
+    res.status(200).json({ success: true, data: { from, to, date: from, data_since: dataSince, thresholds: perf, totals, vehicles: rows } });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
